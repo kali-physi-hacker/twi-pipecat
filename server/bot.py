@@ -25,9 +25,10 @@ from pipecat.utils.tracing.service_decorators import traced_tts
 from pipecat.workers.runner import WorkerRunner
 
 from src.services.ghana_tts_service import GhanaTTSService
-from src.tools.transaction import find_transaction
+from src.services.notevibes_tts_service import NotevibesTTSService
+from src.tools.transaction import find_transaction, get_sum
 
-tools = [find_transaction]
+tools = [find_transaction, get_sum]
 
 
 # Bot logic
@@ -50,11 +51,14 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             model="gpt-4.1",
             max_completion_tokens=150,
             temperature=0.7,
-            system_instruction="You are a voice assistant who speaks English and Twi. Keep responses brief.",
+            system_instruction="""
+            You are a voice assistant who understands English and Twi.
+            If the user asks for any other language, politely decline saying you can only reliably operate in the two languages.
+            Keep responses brief.""",
         ),
     )
     settings = TTSSettings(model="abena", voice="abena_twi_lite", language="Twi")
-    tts = GhanaTTSService(settings)
+    tts = NotevibesTTSService(settings)
 
     # LLm context manager
     context = LLMContext(messages=[], tools=tools)
@@ -90,7 +94,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     async def on_client_ready(rtvi):
         # Kick off the conversation
         context.add_message(
-            {"role": "developer", "content": "Start by concisely introducing yourself."}
+            {
+                "role": "developer",
+                "content": """
+                Start by concisely identifying yourself as a Twi-English voice assistent at the Bank of Minervapolis, and asking for the user's preferred language.
+                For this round, repeat the same statement in both languages.
+                """,
+            }
         )
         await worker.queue_frames([LLMRunFrame()])
 
