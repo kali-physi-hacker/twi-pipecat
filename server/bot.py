@@ -40,7 +40,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # Frame processors
     stt = WhisperSTTService(
         settings=WhisperSTTService.Settings(
-            model="base",
+            model=str(MODEL_PATH),
             language=None,
         ),
     )
