@@ -1,167 +1,190 @@
 import re
+from datetime import datetime, timezone
 
 from pipecat.services.llm_service import FunctionCallParams
 
-from dataclasses import dataclass
+from src.database import TRANSACTIONS
 
 
-@dataclass
-class Transaction:
-    amount: int
-    recipient: str
-    status: str
+def extract_amount(text: str) -> str | None:
+    """Extract a cedi amount from a transfer description."""
+    def normalize(value: str) -> str:
+        if "." not in value:
+            return value
+        return value.rstrip("0").rstrip(".")
+
+    match = re.search(r"\b(\d+(?:\.\d+)?)\s*(?:cedis?|ghs?|ghc)\b", text.lower())
+    if match:
+        return normalize(match.group(1))
+
+    match = re.search(r"(?:cedis?|ghs?|ghc)\s*(\d+(?:\.\d+)?)\b", text.lower())
+    if match:
+        return normalize(match.group(1))
+    return None
 
 
-def extract_amount(params: FunctionCallParams, text: str) -> str | None:
-    """Extract the amount of a failed transfer from a Twi text using a regrex text search.
+def extract_phone_number(text: str) -> str | None:
+    """Extract a Ghanaian local phone number without its leading zero."""
+    match = re.search(r"\b0(\d{9})\b", text)
+    if match:
+        return match.group(1)
 
-    Args:
-        text: The user's request that may or may not contain a cedis amount. e.g. "Hello. Me transfer no antumi anyɛ yiye. Mede cedis 50 kɔmaa 0244624309 na sika no amma?".
-    """
-    match = re.search(r"\b(\d+)\s*(?:cedis?|ghc)?\b", text.lower())
+    match = re.search(r"\b(\d{9})\b", text)
     return match.group(1) if match else None
 
 
-# extract a phone number out of a text using regrex
-def extract_phone_number(text: str) -> str | None:
-    match = re.search(r"\b0\d{9}\b", text)
-    return match.group(0) if match else None
-
-
-# can be an api call
-def lookup_transaction(database, amount: str, recipient: str) -> Transaction | None:
-    return database.get((amount, recipient))
-
-
 async def find_transaction(
-    params: FunctionCallParams, transcript: str
-) -> tuple[Transaction | None, str, str]:
-    statuses = ["pending", "completed", "failed"]
-    database = {
-        (str(amount), recipient): Transaction(
-            amount=amount,
-            recipient=recipient,
-            status=statuses[index % len(statuses)],
-        )
-        for index, (amount, recipient) in enumerate(
-            [
-                (10, "0240000001"),
-                (15, "0240000002"),
-                (20, "0240000003"),
-                (25, "0240000004"),
-                (30, "0240000005"),
-                (35, "0240000006"),
-                (40, "0240000007"),
-                (45, "0240000008"),
-                (50, "0244624309"),
-                (55, "0240000010"),
-                (60, "0240000011"),
-                (65, "0240000012"),
-                (70, "0240000013"),
-                (75, "0240000014"),
-                (80, "0240000015"),
-                (85, "0240000016"),
-                (90, "0240000017"),
-                (95, "0240000018"),
-                (100, "0240000019"),
-                (105, "0240000020"),
-                (110, "0240000021"),
-                (115, "0240000022"),
-                (120, "0240000023"),
-                (125, "0240000024"),
-                (130, "0240000025"),
-                (135, "0240000026"),
-                (140, "0240000027"),
-                (145, "0240000028"),
-                (150, "0240000029"),
-                (155, "0240000030"),
-                (160, "0240000031"),
-                (165, "0240000032"),
-                (170, "0240000033"),
-                (175, "0240000034"),
-                (180, "0240000035"),
-                (185, "0240000036"),
-                (190, "0240000037"),
-                (195, "0240000038"),
-                (200, "0240000039"),
-                (205, "0240000040"),
-                (210, "0240000041"),
-                (215, "0240000042"),
-                (220, "0240000043"),
-                (225, "0240000044"),
-                (230, "0240000045"),
-                (235, "0240000046"),
-                (240, "0240000047"),
-                (245, "0240000048"),
-                (250, "0240000049"),
-                (255, "0240000050"),
-            ]
-        )
-    }
+    params: FunctionCallParams,
+    transcript: str,
+) -> dict:
+    """Find a transaction from an amount and recipient phone number.
+
+    Args:
+        transcript: A description containing the transfer amount and recipient phone number.
+    """
     amount = extract_amount(transcript)
     recipient = extract_phone_number(transcript)
+
     if amount is None or recipient is None:
-        return {
+        result = {
             "status": "missing_information",
             "amount": amount,
             "recipient": recipient,
-            "message": "Ask the user for the missing transfer amount or recipient phone number.",
+            "message": "Ask the user for the missing transfer amount and recipient phone number.",
         }
-    transaction = lookup_transaction(database, amount, recipient)
+        await params.result_callback(result)
+        return result
+
+    recipient_value = int(recipient)
+    amount_value = int(float(amount))
+    transaction = next(
+        (
+            row
+            for row in TRANSACTIONS
+            if row.phone_number_to == recipient_value
+            and row.transaction_amount_in_cedi == amount_value
+        ),
+        None,
+    )
+
     if transaction is None:
-        return {
+        result = {
             "status": "not_found",
             "amount": amount,
             "recipient": recipient,
-            "message": "Transaction was not found. Repeat the amount and recipient phone number and whether they are what the user mentioned.",
+            "message": "No matching transaction was found. Ask the user to confirm the amount and recipient phone number.",
         }
-    return {
+        await params.result_callback(result)
+        return result
+
+    result = {
         "status": "found",
-        "amount": amount,
-        "recipient": recipient,
-        "transaction_status": transaction.status,
-        "message": "Tell the user that the transaction was found and in what status it is.",
+        "transaction_id": transaction.transaction_id,
+        "phone_number_from": transaction.phone_number_from,
+        "phone_number_to": transaction.phone_number_to,
+        "person_name_from": transaction.person_name_from,
+        "person_name_to": transaction.person_name_to,
+        "transaction_amount_in_cedi": transaction.transaction_amount_in_cedi,
+        "date_created": transaction.date_created.isoformat(),
+        "message": "Tell the user that the transaction was found.",
     }
+    await params.result_callback(result)
+    return result
 
 
-def process_failed_transfer(transcript: str) -> dict:
-    lower_text = transcript.lower()
+def _parse_timestamp(value: str | None) -> datetime | None:
+    if value is None or not value.strip():
+        return None
 
-    if "pin" in lower_text:
-        return {
-            "response": "I cannot collect or repeat a PIN. I am transferring you to an agent.",
-            "action": "escalate",
+    parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+async def get_sum(
+    params: FunctionCallParams,
+    person_identifier: str | int,
+    time_from: str | None = None,
+    time_to: str | None = None,
+) -> dict:
+    """Get the gross transaction total for a person in an optional time period.
+
+    Args:
+        person_identifier: The person's name or Ghanaian local phone number.
+        time_from: Optional inclusive ISO timestamp for the start of the period.
+        time_to: Optional inclusive ISO timestamp for the end of the period.
+    """
+    identifier = str(person_identifier).strip()
+    from_timestamp = _parse_timestamp(time_from)
+    to_timestamp = _parse_timestamp(time_to)
+
+    if from_timestamp and to_timestamp and from_timestamp > to_timestamp:
+        result = {
+            "status": "invalid_time_period",
+            "message": "The starting time must be before or equal to the end time.",
         }
+        await params.result_callback(result)
+        return result
 
-    if "agent" in lower_text:
-        return {
-            "response": "I am transferring you to an agent.",
-            "action": "escalate",
-        }
+    identifier_name = identifier.casefold()
+    identifier_phone = int(identifier) if identifier.isdigit() else None
 
-    transaction, amount, recipient = find_transaction(transcript, database)
-
-    # No transaction matches the speaker's description
-    while transaction is None:
-        transcript = input(
-            f"I could not find a {amount} cedi transfer to {recipient}. Could you verify that the information is accurate?"
+    person_rows = [
+        row
+        for row in TRANSACTIONS
+        if (
+            row.person_name_from.casefold() == identifier_name
+            or row.person_name_to.casefold() == identifier_name
+            or (identifier_phone is not None and (
+                row.phone_number_from == identifier_phone
+                or row.phone_number_to == identifier_phone
+            ))
         )
-        # if the user confirms that it was a mistake
-        if transcript == "NO":
-            return {
-                "response": "I could not find that transaction. I am transferring you to an agent.",
-                "action": "escalate",
-            }
-        transaction, amount, recipient = find_transaction(transcript, database)
+    ]
 
-    return {
-        "response": (
-            f"I found the {amount} cedi transfer to {recipient}. "
-            f"It is currently {transaction.status}. "
-            "I will submit a reversal request for human approval."
-        ),
-        "action": "request_reversal_approval",
-        "amount": amount,
-        "recipient": recipient,
-        "status": transaction.status,
+    if not person_rows:
+        result = {
+            "status": "not_found",
+            "person_identifier": person_identifier,
+            "message": "There is no such person in the transaction database.",
+        }
+        await params.result_callback(result)
+        return result
+
+    total_received = 0
+    total_transferred = 0
+    matching_rows = []
+
+    for row in person_rows:
+        if from_timestamp and row.date_created < from_timestamp:
+            continue
+        if to_timestamp and row.date_created > to_timestamp:
+            continue
+
+        matching_rows.append(row)
+        is_sender = (
+            row.person_name_from.casefold() == identifier_name
+            or (identifier_phone is not None and row.phone_number_from == identifier_phone)
+        )
+        is_receiver = (
+            row.person_name_to.casefold() == identifier_name
+            or (identifier_phone is not None and row.phone_number_to == identifier_phone)
+        )
+        if is_sender:
+            total_transferred += row.transaction_amount_in_cedi
+        if is_receiver:
+            total_received += row.transaction_amount_in_cedi
+
+    result = {
+        "status": "found",
+        "person_identifier": person_identifier,
+        "time_from": time_from,
+        "time_to": time_to,
+        "transaction_count": len(matching_rows),
+        "total_amount_received_in_cedi": total_received,
+        "total_amount_transferred_in_cedi": total_transferred,
+        "total_amount_in_cedi": total_received + total_transferred,
     }
+    await params.result_callback(result)
+    return result
