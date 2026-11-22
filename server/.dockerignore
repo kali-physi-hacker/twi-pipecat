@@ -1,0 +1,16 @@
+.venv/
+.env
+.env.*
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+eval-runs/
+*.debug.log
+*.eval.log
+
+# The Dockerfile downloads and converts this model during the build.
+src/models/
