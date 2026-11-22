@@ -57,7 +57,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             Keep responses brief.""",
         ),
     )
-    settings = TTSSettings(model="abena", voice="abena_twi_lite", language="Twi")
+    settings = TTSSettings(model="Notevibes", voice="abena_twi_lite", language="Twi")
     tts = NotevibesTTSService(settings)
 
     # LLm context manager
