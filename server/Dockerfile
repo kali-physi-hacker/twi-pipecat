@@ -6,6 +6,8 @@ ENV UV_COMPILE_BYTECODE=1
 # Copy from the cache instead of linking since it's a mounted volume
 ENV UV_LINK_MODE=copy
 
+ENV PYTHONUNBUFFERED=1
+
 # Uncomment if you wish to print a summary of the features available in the base image
 # ENV PCC_LOG_FEATURES_SUMMARY=true
 
@@ -17,14 +19,4 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy the application code
 COPY ./src src
-# Download and convert the STT model from HF
-RUN --mount=type=cache,target=/root/.cache/huggingface \
-    if [ -f src/models/whisper-twi-v2/model.bin ]; then \
-    echo "Using bundled Whisper model"; \
-    else \
-    ct2-transformers-converter \
-    --model tiffany101/whisper-twi-v2 \
-    --output_dir src/models/whisper-twi-v2 \
-    --copy_files tokenizer.json preprocessor_config.json; \
-    fi
-CMD ["python", "src/bot.py", "-t", "webrtc", "--host", "0.0.0.0", "--port", "7860"]
+COPY ./bot.py bot.py
