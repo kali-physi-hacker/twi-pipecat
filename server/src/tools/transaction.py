@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 
 from pipecat.services.llm_service import FunctionCallParams
 
@@ -8,6 +8,7 @@ from src.database import TRANSACTIONS
 
 def extract_amount(text: str) -> str | None:
     """Extract a cedi amount from a transfer description."""
+
     def normalize(value: str) -> str:
         if "." not in value:
             return value
@@ -98,8 +99,8 @@ def _parse_timestamp(value: str | None) -> datetime | None:
 
     parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
     if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 async def get_sum(
@@ -136,10 +137,13 @@ async def get_sum(
         if (
             row.person_name_from.casefold() == identifier_name
             or row.person_name_to.casefold() == identifier_name
-            or (identifier_phone is not None and (
-                row.phone_number_from == identifier_phone
-                or row.phone_number_to == identifier_phone
-            ))
+            or (
+                identifier_phone is not None
+                and (
+                    row.phone_number_from == identifier_phone
+                    or row.phone_number_to == identifier_phone
+                )
+            )
         )
     ]
 
@@ -163,13 +167,11 @@ async def get_sum(
             continue
 
         matching_rows.append(row)
-        is_sender = (
-            row.person_name_from.casefold() == identifier_name
-            or (identifier_phone is not None and row.phone_number_from == identifier_phone)
+        is_sender = row.person_name_from.casefold() == identifier_name or (
+            identifier_phone is not None and row.phone_number_from == identifier_phone
         )
-        is_receiver = (
-            row.person_name_to.casefold() == identifier_name
-            or (identifier_phone is not None and row.phone_number_to == identifier_phone)
+        is_receiver = row.person_name_to.casefold() == identifier_name or (
+            identifier_phone is not None and row.phone_number_to == identifier_phone
         )
         if is_sender:
             total_transferred += row.transaction_amount_in_cedi
