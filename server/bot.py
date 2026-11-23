@@ -14,12 +14,13 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
     LLMUserAggregatorParams,
 )
-from pipecat.runner.types import RunnerArguments
+from pipecat.runner.types import DailyDialinRequest, RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.settings import STTSettings, TTSSettings
 from pipecat.services.whisper.stt import WhisperSTTService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.daily.transport import DailyDialinSettings, DailyParams, DailyTransport
 from pipecat.utils.tracing.service_decorators import traced_tts
 from pipecat.workers.runner import WorkerRunner
 
@@ -46,9 +47,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             temperature=0.7,
             system_instruction="""
             You are a voice assistant who understands English and Twi.
+            If hte user does not specify, respond in the language 
             If the user asks for any other language, politely decline saying you can only reliably operate in the two languages.
-            If the user's request is not related to any finance-related functionalities you have access to,
+            If the user asks for a specific question (not a mere greeting) that is not related to any finance-related functionalities you have access to,
             tell the user that you do not have access to that information and prompt them to ask about their transactions.
+            You can exchange general conversations like greetings and "how are you"s, but if a user asks about medicine, for example, politely decline the request.
+            The Twi speech-to-text system is premature and may contain typos. In particular, e nad o are often swapped with ɛ and ɔ, respectively, and vice versa.
+            A word may be split into multiple words, and words might be transcribed as one word. Be generous about interpreting it, and aks clarifying questions.
             Keep responses brief.""",
         ),
     )
@@ -85,6 +90,47 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     await runner.add_workers(worker)
 
+    # Start speaking when caller joins
+    @transport.event_handler("on_first_participant_joined")
+    async def on_first_participant_joined(transport, participant):
+        logger.debug(f"First participant joined: {participant['id']}")
+        await worker.queue_frames([LLMRunFrame()])
+
+    @transport.event_handler("on_client_connected")
+    async def on_client_connected(transport, client):
+        logger.info("Client connected")
+
+    @transport.event_handler("on_client_disconnected")
+    async def on_client_disconnected(transport, client):
+        logger.info("Client disconnected")
+        await runner.cancel()
+
+    @transport.event_handler("on_dialin_ready")
+    async def on_dialin_ready(transport, sip_endpoint):
+        logger.info(f"Dial-in ready: {sip_endpoint}")
+
+    @transport.event_handler("on_dialin_connected")
+    async def on_dialin_connected(transport, data):
+        logger.info(f"Dial-in connected: {data}")
+
+    @transport.event_handler("on_dialin_stopped")
+    async def on_dialin_stopped(transport, data):
+        logger.info(f"Dial-in stopped: {data}")
+        await runner.cancel()
+
+    @transport.event_handler("on_dialin_warning")
+    async def on_dialin_warning(transport, data):
+        logger.warning(f"Dial-in warning: {data}")
+
+    @transport.event_handler("on_dialin_error")
+    async def on_dialin_error(transport, data):
+        logger.error(f"Dial-in error: {data}")
+        await runner.cancel()
+
+    @transport.event_handler("on_dtmf_event")
+    async def on_dtmf_event(transport, data):
+        logger.info(f"DTMF event: {data}")
+
     @worker.rtvi.event_handler("on_client_ready")
     async def on_client_ready(rtvi):
         # Kick off the conversation
@@ -99,15 +145,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         )
         await worker.queue_frames([LLMRunFrame()])
 
-    @transport.event_handler("on_client_connected")
-    async def on_client_connected(transport, client):
-        logger.info("Client connected")
-
-    @transport.event_handler("on_client_disconnected")
-    async def on_client_disconnected(transport, client):
-        logger.info("Client disconnected")
-        await runner.cancel()
-
     await runner.run()
 
 
@@ -119,8 +156,23 @@ async def bot(runner_args: RunnerArguments):
             audio_in_enabled=True,
             audio_out_enabled=True,
         ),
+        "daily": lambda: DailyParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+        ),
     }
+
     transport = await create_transport(runner_args, transport_params)
+
+    # Optional: personalize using the dial-in request (which number called, which
+    # number was dialed).
+    if isinstance(runner_args.body, dict) and "dialin_settings" in runner_args.body:
+        request = DailyDialinRequest.model_validate(runner_args.body)
+        if request.dialin_settings.From:
+            logger.info(f"Handling call from: {request.dialin_settings.From}")
+        if request.dialin_settings.To:
+            logger.info(f"Handling call to: {request.dialin_settings.To}")
+
     await run_bot(transport, runner_args)
 
 

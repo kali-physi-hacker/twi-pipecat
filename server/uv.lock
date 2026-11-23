@@ -713,6 +713,18 @@ nvtx = [
 ]
 
 [[package]]
+name = "daily-python"
+version = "0.38.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2a/41/4d0c0e6900e4be88024a1b65d78b722b12b3ec219d76912082e089a0ac92/daily_python-0.38.0-cp39-abi3-macosx_13_0_arm64.whl", hash = "sha256:b5624b983aba85aeff93ed4fadd6eafef5ea9d31493b6e45cb887d57420e771f", size = 12605500, upload-time = "2026-11-12T21:51:10.832Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/ff/1df9945cb3ca6204e7fc922779ce9419a2b8d86c9414a5095b327a0ec89d/daily_python-0.38.0-cp39-abi3-macosx_13_0_x86_64.whl", hash = "sha256:d1856190c9cefaa630e3b741f35035a5318a890193ae3ed027c7e9a4b5d04265", size = 13838390, upload-time = "2026-11-12T21:51:13.553Z" },
+    { url = "https://files.pythonhosted.org/packages/09/10/1762e574bbe84db1063370c2a28cae13ccfd8ac1a7b2397ed6a4c9c4b23c/daily_python-0.38.0-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:cc4f34d3f9288926499cc9c5e933c4f7fb3c9a1ac9d30b0a3b23cc83fac106d2", size = 14375473, upload-time = "2026-11-12T21:51:16.889Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/cb/e63b64336a9b50d4a2f5e557666b4e3f1753ca72447dd44060241d814d3d/daily_python-0.38.0-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:d528926073c892841e71619515fdb4489dbc889336c2063c0e97b4e0df40ce3c", size = 15152522, upload-time = "2026-11-12T21:51:19.701Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/26/8e4388d24e3242fdd523f9039bbe4656ff3f64a0bd08a1457de6fd18f9e8/daily_python-0.38.0-cp39-abi3-win_amd64.whl", hash = "sha256:fa75eed91106689195e2c2b1935c3f681185d40d0a0ea8d598a7287571e5be16", size = 13801949, upload-time = "2026-11-12T21:51:22.653Z" },
+]
+
+[[package]]
 name = "detect-installer"
 version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2586,6 +2598,9 @@ wheels = [
 ]
 
 [package.optional-dependencies]
+daily = [
+    { name = "daily-python" },
+]
 openai = [
     { name = "httpx", extra = ["http2"] },
 ]
@@ -3870,7 +3885,7 @@ dependencies = [
     { name = "mlx-whisper" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "pipecat-ai", extra = ["openai", "runner", "webrtc", "whisper"] },
+    { name = "pipecat-ai", extra = ["daily", "openai", "runner", "webrtc", "whisper"] },
     { name = "pipecatcloud" },
     { name = "transformers" },
 ]
@@ -3885,7 +3900,7 @@ dev = [
 requires-dist = [
     { name = "mlx-whisper", specifier = ">=0.4.3" },
     { name = "numpy", specifier = ">=2.4.6" },
-    { name = "pipecat-ai", extras = ["openai", "runner", "silero", "webrtc", "whisper"], specifier = ">=1.12.0" },
+    { name = "pipecat-ai", extras = ["daily", "openai", "runner", "silero", "webrtc", "whisper"], specifier = ">=1.12.0" },
     { name = "pipecatcloud" },
     { name = "transformers", specifier = ">=5.24.0" },
 ]

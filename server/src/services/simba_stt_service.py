@@ -1,4 +1,5 @@
 import asyncio
+import os
 import tempfile
 import wave
 from collections.abc import AsyncGenerator
@@ -6,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
 
+import requests
 from loguru import logger
 from pipecat.frames.frames import Frame, TranscriptionFrame
 from pipecat.services.settings import STTSettings
@@ -38,10 +40,10 @@ class SimbaSTTService(SegmentedSTTService):
         super().__init__(**kwargs)
         self._settings: STTSettings = settings
         logger.debug("Loading Simba-S model...")
-        self.model = pipeline(
-            "automatic-speech-recognition",
-            model="UBC-NLP/Simba-S",
-        )
+        # self.model = pipeline(
+        #     "automatic-speech-recognition",
+        #     model="UBC-NLP/Simba-S",
+        # )
 
     @property
     def wants_wav_segments(self) -> bool:
@@ -66,7 +68,12 @@ class SimbaSTTService(SegmentedSTTService):
                 return self.model(str(wav_path))
 
         await self.start_processing_metrics()
-        result = await asyncio.to_thread(transcribe)
+        response = requests.post(
+            f"{os.environ['SIMBA_STT_URL']}/transcribe",
+            data=audio,
+            headers={"Content-Type": "application/octet-stream"},
+        )
+        result = response.json()
         await self.stop_processing_metrics()
 
         text = result.get("text", "").strip()
