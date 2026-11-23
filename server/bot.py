@@ -55,7 +55,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # Frame processors
     stt = SimbaSTTService(settings=SimbaSTTSettings(model="simba-s", language="twi"))
-    # stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     llm = OpenAILLMService(
         api_key=os.environ["OPENAPI_KEY"],
@@ -63,26 +62,11 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             model="gpt-4.1",
             max_completion_tokens=150,
             temperature=0.7,
-            system_instruction="""
-            You are a voice assistant who understands English and Twi.
-            If hte user does not specify, respond in the language 
-            If the user asks for any other language, politely decline saying you can only reliably operate in the two languages.
-            If the user asks for a specific question (not a mere greeting) that is not related to any finance-related functionalities you have access to,
-            tell the user that you do not have access to that information and prompt them to ask about their transactions.
-            You can exchange general conversations like greetings and "how are you"s, but if a user asks about medicine, for example, politely decline the request.
-            The Twi speech-to-text system is premature and may contain typos. In particular, e nad o are often swapped with ɛ and ɔ, respectively, and vice versa.
-            A word may be split into multiple words, and words might be transcribed as one word. Be generous about interpreting it, and aks clarifying questions.
-            Keep responses brief.""",
+            system_instruction="You are a voice assistant who understands English and Twi. For this round only, repeat your self-introduction in both languages. Afterwards, stick to the language user speaks or specifically asks for. If the user asks for any other language, politely decline saying you can only reliably operate in the two languages. If the user asks for a specific question (not a mere greeting) that is not related to any finance-related functionalities you have access to, tell the user that you do not have access to that information and prompt them to ask about their transactions. The Twi speech-to-text system is premature and may contain typos. In particular, e nad o are often swapped with ɛ and ɔ, respectively, and vice versa. A word may be split into multiple words, and words might be transcribed as one word. Be generous about interpreting it, and aks clarifying questions. Keep responses brief.",
         ),
     )
     settings = TTSSettings(model="Notevibes", voice="ak-GH-Chirp3-HD-Algenib", language="Twi")
     tts = NotevibesTTSService(settings)
-    # tts = CartesiaTTSService(
-    #     api_key=os.getenv("CARTESIA_API_KEY"),
-    #     settings=CartesiaTTSService.Settings(
-    #         voice=os.getenv("CARTESIA_VOICE_ID", "86e30c1d-714b-4074-a1f2-1cb6b552fb49"),
-    #     ),
-    # )
 
     # LLm context manager
     context = LLMContext(messages=[], tools=tools)
@@ -104,21 +88,10 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     # worker (pipeline runner)
-    # worker = PipelineWorker(
-    #     pipeline,
-    #     name="assistant",
-    #     params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
-    # )
-
     worker = PipelineWorker(
         pipeline,
         name="assistant",
-        params=PipelineParams(
-            enable_metrics=True,
-            enable_usage_metrics=True,
-            audio_in_sample_rate=8000,
-            audio_out_sample_rate=8000,
-        ),
+        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
     )
 
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
@@ -174,7 +147,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
                 "role": "developer",
                 "content": """
                 Start by concisely identifying yourself as a Twi-English voice assistent at the Bank of Minervapolis, and asking for the user's preferred language.
-                For this round, repeat the same statement in both languages.
                 """,
             }
         )
