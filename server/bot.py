@@ -31,8 +31,21 @@ from src.tools.transaction import find_transaction, get_sum
 
 tools = [find_transaction, get_sum]
 
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
+# Keep the original method
+_original_handle_dialin_ready = DailyTransport._handle_dialin_ready
+
+
+async def patched_handle_dialin_ready(self, sip_endpoint):
+    # Convert the dictionary into the SIP URI string
+    if isinstance(sip_endpoint, dict):
+        sip_endpoint = sip_endpoint["sipEndpoint"]
+
+    # Call Pipecat's original implementation
+    await _original_handle_dialin_ready(self, sip_endpoint)
+
+
+# Replace the class method at runtime
+DailyTransport._handle_dialin_ready = patched_handle_dialin_ready
 
 
 # Bot logic
@@ -41,8 +54,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info("Starting bot")
 
     # Frame processors
-    # stt = SimbaSTTService(settings=SimbaSTTSettings(model="simba-s", language="twi"))
-    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+    stt = SimbaSTTService(settings=SimbaSTTSettings(model="simba-s", language="twi"))
+    # stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
 
     llm = OpenAILLMService(
         api_key=os.environ["OPENAPI_KEY"],
@@ -63,13 +76,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
     settings = TTSSettings(model="Notevibes", voice="ak-GH-Chirp3-HD-Algenib", language="Twi")
-    # tts = NotevibesTTSService(settings)
-    tts = CartesiaTTSService(
-        api_key=os.getenv("CARTESIA_API_KEY"),
-        settings=CartesiaTTSService.Settings(
-            voice=os.getenv("CARTESIA_VOICE_ID", "86e30c1d-714b-4074-a1f2-1cb6b552fb49"),
-        ),
-    )
+    tts = NotevibesTTSService(settings)
+    # tts = CartesiaTTSService(
+    #     api_key=os.getenv("CARTESIA_API_KEY"),
+    #     settings=CartesiaTTSService.Settings(
+    #         voice=os.getenv("CARTESIA_VOICE_ID", "86e30c1d-714b-4074-a1f2-1cb6b552fb49"),
+    #     ),
+    # )
 
     # LLm context manager
     context = LLMContext(messages=[], tools=tools)
