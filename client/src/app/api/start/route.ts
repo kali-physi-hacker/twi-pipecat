@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const botStartUrl =
-    process.env.BOT_START_URL || 'http://localhost:7860/start';
+    process.env.BOT_START_URL || "http://localhost:7860/start";
 
   if (!process.env.BOT_START_URL) {
     console.warn(
-      'BOT_START_URL not configured, using default: http://localhost:7860/start'
+      "BOT_START_URL not configured, using default: http://localhost:7860/start",
     );
   }
 
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     const requestData = await request.json();
 
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
 
     if (process.env.BOT_START_PUBLIC_API_KEY) {
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
     // Pass through the request data from the client
     const response = await fetch(botStartUrl, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: JSON.stringify(requestData),
     });
@@ -35,6 +35,8 @@ export async function POST(request: Request) {
 
     const data = await response.json();
 
+    data.webrtcUrl = `http://localhost:7860/sessions/${data.sessionId}/api/offer`;
+
     if (data.error) {
       throw new Error(data.error);
     }
@@ -43,7 +45,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: `Failed to process connection request: ${error}` },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
