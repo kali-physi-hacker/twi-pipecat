@@ -1,7 +1,11 @@
 import type { Transport } from "@pipecat-ai/client-js";
 
 export type TransportType =
-  "daily" | "smallwebrtc" | "websocket" | "moq" | "livekit";
+  | "daily"
+  | "smallwebrtc"
+  | "websocket"
+  | "moq"
+  | "livekit";
 export type TransportOptions = Record<string, unknown>;
 export type TransportFactory = (
   options?: TransportOptions,
