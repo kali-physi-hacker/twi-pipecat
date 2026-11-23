@@ -31,6 +31,9 @@ from src.tools.transaction import find_transaction, get_sum
 
 tools = [find_transaction, get_sum]
 
+from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.deepgram.stt import DeepgramSTTService
+
 
 # Bot logic
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -38,7 +41,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     logger.info("Starting bot")
 
     # Frame processors
-    stt = SimbaSTTService(settings=SimbaSTTSettings(model="simba-s", language="twi"))
+    # stt = SimbaSTTService(settings=SimbaSTTSettings(model="simba-s", language="twi"))
+    stt = DeepgramSTTService(api_key=os.getenv("DEEPGRAM_API_KEY"))
+
     llm = OpenAILLMService(
         api_key=os.environ["OPENAPI_KEY"],
         settings=OpenAILLMService.Settings(
@@ -58,7 +63,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         ),
     )
     settings = TTSSettings(model="Notevibes", voice="ak-GH-Chirp3-HD-Algenib", language="Twi")
-    tts = NotevibesTTSService(settings)
+    # tts = NotevibesTTSService(settings)
+    tts = CartesiaTTSService(
+        api_key=os.getenv("CARTESIA_API_KEY"),
+        settings=CartesiaTTSService.Settings(
+            voice=os.getenv("CARTESIA_VOICE_ID", "86e30c1d-714b-4074-a1f2-1cb6b552fb49"),
+        ),
+    )
 
     # LLm context manager
     context = LLMContext(messages=[], tools=tools)
@@ -80,10 +91,21 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     # worker (pipeline runner)
+    # worker = PipelineWorker(
+    #     pipeline,
+    #     name="assistant",
+    #     params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+    # )
+
     worker = PipelineWorker(
         pipeline,
         name="assistant",
-        params=PipelineParams(enable_metrics=True, enable_usage_metrics=True),
+        params=PipelineParams(
+            enable_metrics=True,
+            enable_usage_metrics=True,
+            audio_in_sample_rate=8000,
+            audio_out_sample_rate=8000,
+        ),
     )
 
     runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
@@ -107,7 +129,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     @transport.event_handler("on_dialin_ready")
     async def on_dialin_ready(transport, sip_endpoint):
-        logger.info(f"Dial-in ready: {sip_endpoint}")
+        logger.info(f"Dial-in ready: {sip_endpoint['sipEndpoint']}")
 
     @transport.event_handler("on_dialin_connected")
     async def on_dialin_connected(transport, data):
