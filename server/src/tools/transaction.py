@@ -87,6 +87,7 @@ async def find_transaction(
         "person_name_to": transaction.person_name_to,
         "transaction_amount_in_cedi": transaction.transaction_amount_in_cedi,
         "date_created": transaction.date_created.isoformat(),
+        "transfer_status": transaction.status,
         "message": "Tell the user that the transaction was found.",
     }
     await params.result_callback(result)
@@ -105,18 +106,42 @@ def _parse_timestamp(value: str | None) -> datetime | None:
 
 async def get_sum(
     params: FunctionCallParams,
-    person_identifier: str | int,
+    phone_number: str | int | None = None,
     time_from: str | None = None,
     time_to: str | None = None,
 ) -> dict:
-    """Get the gross transaction total for a person in an optional time period.
+    """Get the gross transaction total for a phone number in an optional time period.
 
     Args:
-        person_identifier: The person's name or Ghanaian local phone number.
+        phone_number: Ghanaian local or international-format phone number.
         time_from: Optional inclusive ISO timestamp for the start of the period.
         time_to: Optional inclusive ISO timestamp for the end of the period.
     """
-    identifier = str(person_identifier).strip()
+    if phone_number is None or not str(phone_number).strip():
+        result = {
+            "status": "missing_information",
+            "message": "Please provide the person's Ghanaian phone number.",
+        }
+        await params.result_callback(result)
+        return result
+
+    raw_phone = re.sub(r"\D", "", str(phone_number).strip())
+    if raw_phone.startswith("233") and len(raw_phone) == 12:
+        raw_phone = "0" + raw_phone[3:]
+
+    if len(raw_phone) == 10 and raw_phone.startswith("0"):
+        identifier_phone = int(raw_phone[1:])
+    elif len(raw_phone) == 9:
+        identifier_phone = int(raw_phone)
+    else:
+        result = {
+            "status": "invalid_phone_number",
+            "phone_number": phone_number,
+            "message": "Please provide a valid Ghanaian local or international phone number.",
+        }
+        await params.result_callback(result)
+        return result
+
     from_timestamp = _parse_timestamp(time_from)
     to_timestamp = _parse_timestamp(time_to)
 
@@ -128,30 +153,17 @@ async def get_sum(
         await params.result_callback(result)
         return result
 
-    identifier_name = identifier.casefold()
-    identifier_phone = int(identifier) if identifier.isdigit() else None
-
     person_rows = [
         row
         for row in TRANSACTIONS
-        if (
-            row.person_name_from.casefold() == identifier_name
-            or row.person_name_to.casefold() == identifier_name
-            or (
-                identifier_phone is not None
-                and (
-                    row.phone_number_from == identifier_phone
-                    or row.phone_number_to == identifier_phone
-                )
-            )
-        )
+        if row.phone_number_from == identifier_phone or row.phone_number_to == identifier_phone
     ]
 
     if not person_rows:
         result = {
             "status": "not_found",
-            "person_identifier": person_identifier,
-            "message": "There is no such person in the transaction database.",
+            "phone_number": phone_number,
+            "message": "There is no transaction record for this phone number.",
         }
         await params.result_callback(result)
         return result
@@ -167,12 +179,8 @@ async def get_sum(
             continue
 
         matching_rows.append(row)
-        is_sender = row.person_name_from.casefold() == identifier_name or (
-            identifier_phone is not None and row.phone_number_from == identifier_phone
-        )
-        is_receiver = row.person_name_to.casefold() == identifier_name or (
-            identifier_phone is not None and row.phone_number_to == identifier_phone
-        )
+        is_sender = row.phone_number_from == identifier_phone
+        is_receiver = row.phone_number_to == identifier_phone
         if is_sender:
             total_transferred += row.transaction_amount_in_cedi
         if is_receiver:
@@ -180,7 +188,7 @@ async def get_sum(
 
     result = {
         "status": "found",
-        "person_identifier": person_identifier,
+        "phone_number": phone_number,
         "time_from": time_from,
         "time_to": time_to,
         "transaction_count": len(matching_rows),

@@ -31,7 +31,7 @@ class NotevibesTTSService(TTSService):
             json={
                 "title": "text",
                 "content": text,
-                "voice": "ak-GH-Chirp3-HD-Algenib",
+                "voice": self._settings.voice,
             },
         )
 

@@ -17,8 +17,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.services.settings import TTSSettings
-from pipecat.services.tts_service import TTSService
+from pipecat.services.settings import STTSettings, TTSSettings
 from pipecat.services.whisper.stt import WhisperSTTService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.utils.tracing.service_decorators import traced_tts
@@ -26,6 +25,7 @@ from pipecat.workers.runner import WorkerRunner
 
 from src.services.ghana_tts_service import GhanaTTSService
 from src.services.notevibes_tts_service import NotevibesTTSService
+from src.services.simba_stt_service import SimbaSTTService, SimbaSTTSettings
 from src.tools.transaction import find_transaction, get_sum
 
 tools = [find_transaction, get_sum]
@@ -34,17 +34,10 @@ tools = [find_transaction, get_sum]
 # Bot logic
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
-    MODEL_PATH = Path(__file__).resolve().parent / "models/whisper-twi-v2"
-
     logger.info("Starting bot")
 
     # Frame processors
-    stt = WhisperSTTService(
-        settings=WhisperSTTService.Settings(
-            model=str(MODEL_PATH),
-            language=None,
-        ),
-    )
+    stt = SimbaSTTService(settings=SimbaSTTSettings(model="simba-s", language="twi"))
     llm = OpenAILLMService(
         api_key=os.environ["OPENAPI_KEY"],
         settings=OpenAILLMService.Settings(
@@ -54,10 +47,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             system_instruction="""
             You are a voice assistant who understands English and Twi.
             If the user asks for any other language, politely decline saying you can only reliably operate in the two languages.
+            If the user's request is not related to any finance-related functionalities you have access to,
+            tell the user that you do not have access to that information and prompt them to ask about their transactions.
             Keep responses brief.""",
         ),
     )
-    settings = TTSSettings(model="Notevibes", voice="abena_twi_lite", language="Twi")
+    settings = TTSSettings(model="Notevibes", voice="ak-GH-Chirp3-HD-Algenib", language="Twi")
     tts = NotevibesTTSService(settings)
 
     # LLm context manager

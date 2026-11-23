@@ -1,7 +1,9 @@
+import csv
 import random
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -13,6 +15,7 @@ class Transaction:
     person_name_to: str
     transaction_amount_in_cedi: int
     date_created: datetime
+    status: str
 
 
 NAMES = (
@@ -104,6 +107,11 @@ def _build_transactions(count: int = 2000) -> tuple[Transaction, ...]:
                 f"{phone_from}-{phone_to}-{amount}-{date_created.isoformat()}",
             )
         )
+        status = rng.choices(
+            ("completed", "pending", "failed"),
+            weights=(70, 20, 10),
+            k=1,
+        )[0]
         rows.append(
             Transaction(
                 transaction_id=transaction_id,
@@ -113,10 +121,41 @@ def _build_transactions(count: int = 2000) -> tuple[Transaction, ...]:
                 person_name_to=to_name,
                 transaction_amount_in_cedi=amount,
                 date_created=date_created,
+                status=status,
             )
         )
 
-    return tuple(sorted(rows, key=lambda row: row.date_created))
+    transactions = tuple(sorted(rows, key=lambda row: row.date_created))
+
+    csv_path = Path(__file__).with_name("transactions.csv")
+    fields = (
+        "transaction_id",
+        "phone_number_from",
+        "phone_number_to",
+        "person_name_from",
+        "person_name_to",
+        "transaction_amount_in_cedi",
+        "date_created",
+        "status",
+    )
+    with csv_path.open("w", newline="", encoding="utf-8") as csv_file:
+        writer = csv.DictWriter(csv_file, fieldnames=fields)
+        writer.writeheader()
+        for transaction in transactions:
+            writer.writerow(
+                {
+                    "transaction_id": transaction.transaction_id,
+                    "phone_number_from": transaction.phone_number_from,
+                    "phone_number_to": transaction.phone_number_to,
+                    "person_name_from": transaction.person_name_from,
+                    "person_name_to": transaction.person_name_to,
+                    "transaction_amount_in_cedi": transaction.transaction_amount_in_cedi,
+                    "date_created": transaction.date_created.isoformat(),
+                    "status": transaction.status,
+                }
+            )
+
+    return transactions
 
 
 TRANSACTIONS = _build_transactions()
