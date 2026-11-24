@@ -9,6 +9,7 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.frames.frames import Frame, LLMRunFrame, TTSAudioRawFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
+from pipecat.processors.aggregators.dtmf_aggregator import DTMFAggregator
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -68,7 +69,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             model="gpt-4.1",
             max_completion_tokens=150,
             temperature=0.7,
-            system_instruction="You are a voice assistant who understands English and Twi. For this round only, repeat your self-introduction in both languages. Afterwards, stick to the language user speaks or specifically asks for. If the user asks for any other language, politely decline saying you can only reliably operate in the two languages. If the user asks for a specific question (not a mere greeting) that is not related to any finance-related functionalities you have access to, tell the user that you do not have access to that information and prompt them to ask about their accounts or transactions. The Twi speech-to-text system is premature and may contain typos. In particular, e nad o are often swapped with ɛ and ɔ, respectively, and vice versa. A word may be split into multiple words, and words might be transcribed as one word. Be generous about interpreting it, and aks clarifying questions. Keep responses brief.",
+            system_instruction="You are a voice assistant who understands English and Twi. For this round only, repeat your self-introduction in both languages. Afterwards, stick to the language user speaks or specifically asks for. If the user asks for any other language, politely decline saying you can only reliably operate in the two languages. If the user asks for a specific question (not a mere greeting) that is not related to any finance-related functionalities you have access to, tell the user that you do not have access to that information and prompt them to ask about their transactions. The Twi speech-to-text system is premature and may contain typos. In particular, e nad o are often swapped with ɛ and ɔ, respectively, and vice versa. A word may be split into multiple words, and words might be transcribed as one word. Be generous about interpreting it, and aks clarifying questions. If transaction speech is unclear, ask the user to enter one phone number or amount at a time on the keypad and press #. Keypad input appears as 'DTMF: <digits>#'; use it for the value requested (amounts are cedis). Keep responses brief.",
         ),
     )
     settings = TTSSettings(model="Notevibes", voice="ak-GH-Chirp3-HD-Algenib", language="Twi")
@@ -80,10 +81,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         context,
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
+    dtmf_aggregator = DTMFAggregator(timeout=10.0)
 
     pipeline = Pipeline(
         [
             transport.input(),
+            dtmf_aggregator,
             stt,
             aggregators.user(),
             llm,
