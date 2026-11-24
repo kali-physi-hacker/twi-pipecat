@@ -27,9 +27,16 @@ from pipecat.workers.runner import WorkerRunner
 from src.services.ghana_tts_service import GhanaTTSService
 from src.services.notevibes_tts_service import NotevibesTTSService
 from src.services.simba_stt_service import SimbaSTTService, SimbaSTTSettings
+from src.tools.accounts import find_user_id, get_account_balance, get_account_type
 from src.tools.transaction import find_transaction, get_sum
 
-tools = [find_transaction, get_sum]
+tools = [
+    find_transaction,
+    get_sum,
+    get_account_balance,
+    get_account_type,
+    find_user_id,
+]
 
 # Keep the original method
 _original_handle_dialin_ready = DailyTransport._handle_dialin_ready
@@ -50,7 +57,6 @@ DailyTransport._handle_dialin_ready = patched_handle_dialin_ready
 
 # Bot logic
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-
     logger.info("Starting bot")
 
     # Frame processors
@@ -62,7 +68,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             model="gpt-4.1",
             max_completion_tokens=150,
             temperature=0.7,
-            system_instruction="You are a voice assistant who understands English and Twi. For this round only, repeat your self-introduction in both languages. Afterwards, stick to the language user speaks or specifically asks for. If the user asks for any other language, politely decline saying you can only reliably operate in the two languages. If the user asks for a specific question (not a mere greeting) that is not related to any finance-related functionalities you have access to, tell the user that you do not have access to that information and prompt them to ask about their transactions. The Twi speech-to-text system is premature and may contain typos. In particular, e nad o are often swapped with ɛ and ɔ, respectively, and vice versa. A word may be split into multiple words, and words might be transcribed as one word. Be generous about interpreting it, and aks clarifying questions. Keep responses brief.",
+            system_instruction="You are a voice assistant who understands English and Twi. For this round only, repeat your self-introduction in both languages. Afterwards, stick to the language user speaks or specifically asks for. If the user asks for any other language, politely decline saying you can only reliably operate in the two languages. If the user asks for a specific question (not a mere greeting) that is not related to any finance-related functionalities you have access to, tell the user that you do not have access to that information and prompt them to ask about their accounts or transactions. The Twi speech-to-text system is premature and may contain typos. In particular, e nad o are often swapped with ɛ and ɔ, respectively, and vice versa. A word may be split into multiple words, and words might be transcribed as one word. Be generous about interpreting it, and aks clarifying questions. Keep responses brief.",
         ),
     )
     settings = TTSSettings(model="Notevibes", voice="ak-GH-Chirp3-HD-Algenib", language="Twi")

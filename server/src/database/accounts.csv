@@ -1,0 +1,21 @@
+user_id,phone_number,full_name,account_type,balance_ghs
+001,0241234567,Ama Mensah,Checkings,13414.42
+002,0552345678,Kwame Asare,Savings,47016.27
+003,0203456789,Akosua Boateng,Savings,45242.37
+004,0504567890,Kofi Owusu,Checkings,32600.87
+005,0275678901,Abena Sarpong,Savings,2467.52
+006,0596789012,Yaw Mensah,Savings,8464.83
+007,0547890123,Efua Addo,Checkings,22789.11
+008,0238901234,Kojo Agyeman,Savings,4453.77
+009,0539012345,Mariam Issah,Checkings,28700.99
+010,0251123456,Nana Yeboah,Checkings,27403.72
+011,0242234567,Adwoa Frimpong,Savings,5092.45
+012,0553345678,Ibrahim Osman,Checkings,4230.38
+013,0204456789,Selorm Kpodo,Checkings,47416.32
+014,0505567890,Esi Ofori,Savings,16433.73
+015,0276678901,Samuel Quaye,Checkings,49460.29
+016,0597789012,Felicity Appiah,Savings,26985.39
+017,0548890123,Emmanuel Tetteh,Checkings,33921.55
+018,0239901234,Comfort Darko,Checkings,48850.83
+019,0531012345,Josephine Nartey,Checkings,33005.07
+020,0252123456,Rashid Yakubu,Savings,45080.60
